@@ -1,8 +1,7 @@
-#src/app.py
+# src/app.py
 import nest_asyncio
 nest_asyncio.apply()
 
-# app.py
 import streamlit as st
 from src.helper import (
     get_pdf_text,
@@ -11,29 +10,41 @@ from src.helper import (
     get_conversational_chain
 )
 
-# Page config must be set first
+# Set page config first
 st.set_page_config(page_title="Information Retrieval")
 
 def user_input(user_question):
-    response = st.session_state.conversation.invoke({'question': user_question})
-    st.session_state.chatHistory = response['chat_history']
-    
-    for i, message in enumerate(st.session_state.chatHistory):
-        if i % 2 == 0:
-            st.write("User: ", message.content)
+    # Check if the conversation chain is initialized
+    if st.session_state.conversation is None:
+        st.error("Please process PDF files before asking questions.")
+        return
+
+    # Invoke the conversation chain
+    response = st.session_state.conversation.invoke({"question": user_question})
+    answer = response.get("answer", "No answer found.")
+
+    # Append user input and answer to chat history
+    st.session_state.chatHistory.append({"role": "user", "content": user_question})
+    st.session_state.chatHistory.append({"role": "assistant", "content": answer})
+
+    # Display the entire chat history
+    for message in st.session_state.chatHistory:
+        if message["role"] == "user":
+            st.write(f"User: {message['content']}")
         else:
-            st.write("Reply: ", message.content)
+            st.write(f"Reply: {message['content']}")
 
 def main():
     st.header("Information-Retrieval-System")
 
     user_question = st.text_input("Ask a Question from the PDF Files")
 
+    # Initialize session state variables
     if "conversation" not in st.session_state:
         st.session_state.conversation = None
     if "chatHistory" not in st.session_state:
-        st.session_state.chatHistory = None
-    
+        st.session_state.chatHistory = []  # Initialize as empty list
+
     if user_question:
         user_input(user_question)
     
@@ -46,15 +57,15 @@ def main():
 
         if st.button("Submit & Process"):
             with st.spinner("Processing..."):
-                # Step 1: Extract text
+                # Process PDFs
                 raw_text = get_pdf_text(pdf_docs)
-                # Step 2: Split into chunks
                 text_chunks = get_text_chunks(raw_text)
-                # Step 3: Embed & build vector store
                 vector_store = get_vector_store(text_chunks)
-                # Step 4: Build conversation chain
+                
+                # Reset conversation and chat history
                 st.session_state.conversation = get_conversational_chain(vector_store)
-                st.success("Done")
+                st.session_state.chatHistory = []
+                st.success("Processing complete!")
 
 if __name__ == "__main__":
     main()

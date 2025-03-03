@@ -1,0 +1,2 @@
+run this command to prepare for locally running the model:
+pip install torch transformers accelerate
